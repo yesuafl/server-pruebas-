@@ -574,7 +574,7 @@
         let map;
 
         // State
-        let currentMode = 'blocked'; // 'blocked' | 'favorite'
+        let currentMode = (new URLSearchParams(window.location.search)).get('mode') || 'blocked'; // 'blocked' | 'favorite'
         let zones = {
             blocked: [],
             favorite: []
