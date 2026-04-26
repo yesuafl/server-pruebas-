@@ -1,0 +1,1198 @@
+<!DOCTYPE html>
+<html lang="es">
+
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport"
+        content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no, viewport-fit=cover">
+    <title>Zonas</title>
+
+    <!-- Mapbox / Leaflet -->
+    <link rel="stylesheet" href="https://unpkg.com/leaflet@1.9.4/dist/leaflet.css" />
+    <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/leaflet.draw/1.0.4/leaflet.draw.css" />
+    <link
+        href="https://fonts.googleapis.com/css2?family=Share+Tech+Mono&family=Rajdhani:wght@400;500;600;700&display=swap"
+        rel="stylesheet">
+
+    <style>
+        :root {
+            /* Palette - Cyberpunk */
+            --bg-dark: #09090b;
+            /* Very dark/black */
+            --surface: rgba(14, 14, 16, 0.95);
+            --primary: #fcee0a;
+            /* Cyber Yellow */
+            --primary-dark: #ccbe00;
+            --text-main: #e2e8f0;
+            --text-sec: #94a3b8;
+            --danger: #ff003c;
+            /* Cyber Red/Magenta */
+            --accent: #00f3ff;
+            /* Cyan */
+            --favorite: #00ff66;
+            /* Success Green for favorites */
+        }
+
+        * {
+            box-sizing: border-box;
+            -webkit-tap-highlight-color: transparent;
+        }
+
+        body {
+            margin: 0;
+            padding: 0;
+            font-family: 'Rajdhani', sans-serif;
+            background: var(--bg-dark);
+            color: var(--text-main);
+            height: 100vh;
+            width: 100vw;
+            overflow: hidden;
+            display: flex;
+            flex-direction: column;
+            text-transform: uppercase;
+        }
+
+        /* --- MAP LAYER --- */
+        #map {
+            position: absolute;
+            top: 0;
+            left: 0;
+            right: 0;
+            bottom: 0;
+            z-index: 1;
+            background: #111;
+        }
+
+        /* --- UI OVERLAYS --- */
+        .ui-layer {
+            position: absolute;
+            top: 0;
+            left: 0;
+            right: 0;
+            bottom: 0;
+            z-index: 1000;
+            pointer-events: none;
+            /* Let clicks pass to map where empty */
+            display: flex;
+            flex-direction: column;
+            justify-content: space-between;
+        }
+
+        /* HEADER */
+        .header-bar {
+            background: rgba(9, 9, 11, 0.9);
+            backdrop-filter: blur(4px);
+            padding: 16px;
+            padding-top: max(16px, env(safe-area-inset-top));
+            display: flex;
+            align-items: center;
+            justify-content: space-between;
+            pointer-events: auto;
+            border-bottom: 2px solid var(--accent);
+            box-shadow: 0 2px 10px rgba(0, 243, 255, 0.2);
+        }
+
+        .header-left {
+            display: flex;
+            align-items: center;
+            gap: 12px;
+        }
+
+        .back-btn {
+            background: none;
+            border: none;
+            color: white;
+            font-size: 24px;
+            cursor: pointer;
+            padding: 0;
+            text-decoration: none;
+            display: flex;
+            align-items: center;
+        }
+
+        .header-title {
+            font-size: 18px;
+            font-weight: 700;
+            margin-right: auto;
+            margin-left: 10px;
+            font-family: 'Share Tech Mono', monospace;
+            color: var(--primary);
+            letter-spacing: 1px;
+            text-shadow: 2px 2px 0px var(--danger);
+        }
+
+        /* MODE SWITCHER */
+        .mode-switcher {
+            background: rgba(255, 255, 255, 0.1);
+            padding: 4px;
+            border-radius: 12px;
+            display: flex;
+            gap: 4px;
+            margin-right: 10px;
+        }
+
+        .mode-btn {
+            border: none;
+            background: transparent;
+            color: var(--text-sec);
+            padding: 8px 12px;
+            border-radius: 0;
+            font-weight: 600;
+            font-size: 14px;
+            font-family: 'Share Tech Mono', monospace;
+            cursor: pointer;
+            transition: all 0.2s;
+            display: flex;
+            align-items: center;
+            gap: 6px;
+            border: 1px solid transparent;
+        }
+
+        .mode-btn.active-blocked {
+            background: rgba(255, 0, 60, 0.2);
+            border-color: var(--danger);
+            color: white;
+            box-shadow: 2px 2px 0px var(--danger);
+        }
+
+        .mode-btn.active-favorite {
+            background: rgba(0, 255, 102, 0.2);
+            border-color: var(--favorite);
+            color: white;
+            box-shadow: 2px 2px 0px var(--favorite);
+        }
+
+        /* TOGGLES BAR */
+        .toggles-bar {
+            pointer-events: auto;
+            padding: 8px 16px;
+            display: flex;
+            gap: 10px;
+            justify-content: center;
+            background: linear-gradient(to bottom, rgba(15, 17, 26, 0.9) 0%, rgba(15, 17, 26, 0) 100%);
+        }
+
+        .toggle-chip {
+            background: rgba(0, 0, 0, 0.8);
+            border: 1px solid var(--accent);
+            color: var(--text-sec);
+            padding: 8px 16px;
+            border-radius: 0;
+            font-size: 14px;
+            font-weight: 600;
+            font-family: 'Share Tech Mono', monospace;
+            cursor: pointer;
+            display: flex;
+            align-items: center;
+            gap: 8px;
+            transition: all 0.2s;
+            clip-path: polygon(10px 0, 100% 0, 100% calc(100% - 10px), calc(100% - 10px) 100%, 0 100%, 0 10px);
+        }
+
+
+        .toggle-chip.active {
+            color: black;
+            border-color: transparent;
+            /* Reset background in specific modifiers */
+        }
+
+        .toggle-chip.active.blocked {
+            background: var(--danger);
+            box-shadow: 4px 4px 0px rgba(255, 0, 60, 0.4);
+        }
+
+        .toggle-chip.active.favorite {
+            background: var(--favorite);
+            box-shadow: 4px 4px 0px rgba(0, 255, 102, 0.4);
+        }
+
+        /* EDIT INPUTS (TOP) */
+        .edit-inputs {
+            pointer-events: none;
+            padding: 10px 16px;
+            display: flex;
+            gap: 10px;
+            transform: translateY(-100px);
+            opacity: 0;
+            transition: all 0.3s cubic-bezier(0.16, 1, 0.3, 1);
+        }
+
+        .edit-inputs.visible {
+            pointer-events: auto;
+            transform: translateY(0);
+            opacity: 1;
+        }
+
+        .floating-input {
+            background: rgba(0, 0, 0, 0.8);
+            color: var(--accent);
+            border: 1px solid var(--accent);
+            border-radius: 0;
+            padding: 10px 12px;
+            font-size: 15px;
+            font-weight: 600;
+            flex: 1;
+            box-shadow: 4px 4px 0px rgba(0, 243, 255, 0.2);
+            font-family: 'Share Tech Mono', monospace;
+            text-transform: uppercase;
+        }
+
+        .floating-input::placeholder {
+            color: rgba(0, 243, 255, 0.5);
+        }
+
+        .floating-input:focus {
+            outline: none;
+            background: black;
+            border-color: var(--primary);
+            box-shadow: 4px 4px 0px rgba(252, 238, 10, 0.4);
+            color: var(--primary);
+        }
+
+        .floating-select {
+            background: rgba(0, 0, 0, 0.8);
+            color: var(--accent);
+            border: 1px solid var(--accent);
+            border-radius: 0;
+            padding: 10px 12px;
+            font-size: 15px;
+            font-weight: 600;
+            flex: 1;
+            box-shadow: 4px 4px 0px rgba(0, 243, 255, 0.2);
+            font-family: 'Share Tech Mono', monospace;
+            appearance: none;
+            background-image: url("data:image/svg+xml;charset=US-ASCII,%3Csvg%20xmlns%3D%22http%3A%2F%2Fwww.w3.org%2F2000%2Fsvg%22%20width%3D%22292.4%22%20height%3D%22292.4%22%3E%3Cpath%20fill%3D%22%2300f3ff%22%20d%3D%22M287%2069.4a17.6%2017.6%200%200%200-13-5.4H18.4c-5%200-9.3%201.8-12.9%205.4A17.6%2017.6%200%200%200%200%2082.2c0%205%201.8%209.3%205.4%2012.9l128%20127.9c3.6%203.6%207.8%205.4%2012.8%205.4s9.2-1.8%2012.8-5.4L287%2095c3.5-3.5%205.4-7.8%205.4-12.8%200-5-1.9-9.2-5.5-12.8z%22%2F%3E%3C%2Fsvg%3E");
+            background-repeat: no-repeat;
+            background-position: right 10px center;
+            background-size: 8px auto;
+            text-transform: uppercase;
+        }
+
+        .floating-select:focus {
+            outline: none;
+            border-color: var(--primary);
+        }
+
+        /* BOTTOM CONTROLS */
+        .bottom-controls {
+            pointer-events: none;
+            padding: 20px 16px;
+            padding-bottom: max(20px, env(safe-area-inset-bottom));
+            background: linear-gradient(to top, rgba(9, 9, 11, 0.95) 0%, rgba(9, 9, 11, 0.8) 60%, transparent 100%);
+            display: flex;
+            flex-direction: column;
+            gap: 16px;
+            transform: translateY(200px);
+            opacity: 0;
+            transition: all 0.3s cubic-bezier(0.16, 1, 0.3, 1);
+        }
+
+        .bottom-controls.visible {
+            pointer-events: auto;
+            transform: translateY(0);
+            opacity: 1;
+        }
+
+        /* Slider Row */
+        .slider-row {
+            display: flex;
+            align-items: center;
+            gap: 12px;
+            justify-content: space-between;
+        }
+
+        .trash-btn {
+            background: rgba(255, 0, 60, 0.1);
+            color: var(--danger);
+            border: 1px solid var(--danger);
+            width: 50px;
+            height: 50px;
+            border-radius: 0;
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            font-size: 20px;
+            cursor: pointer;
+            box-shadow: 4px 4px 0px rgba(255, 0, 60, 0.3);
+            transition: transform 0.2s, box-shadow 0.2s;
+            clip-path: polygon(10px 0, 100% 0, 100% calc(100% - 10px), calc(100% - 10px) 100%, 0 100%, 0 10px);
+        }
+
+        .trash-btn:hover {
+            background: var(--danger);
+            color: black;
+        }
+
+        .trash-btn:active {
+            transform: translate(2px, 2px);
+            box-shadow: 2px 2px 0px rgba(255, 0, 60, 0.3);
+        }
+
+        /* Save Button */
+        .save-btn {
+            background: var(--primary);
+            color: black;
+            border: 2px solid var(--primary);
+            width: 100%;
+            padding: 16px;
+            font-size: 18px;
+            font-weight: 800;
+            border-radius: 0;
+            cursor: pointer;
+            text-transform: uppercase;
+            box-shadow: 6px 6px 0px var(--accent);
+            letter-spacing: 2px;
+            font-family: 'Share Tech Mono', monospace;
+            transition: all 0.2s;
+            clip-path: polygon(20px 0, 100% 0, 100% calc(100% - 20px), calc(100% - 20px) 100%, 0 100%, 0 20px);
+        }
+
+        .save-btn:active {
+            transform: translate(2px, 2px);
+            box-shadow: 2px 2px 0px var(--accent);
+        }
+
+        /* NEW FLOATING DRAW CONTROLS */
+        .draw-actions {
+            display: flex;
+            gap: 12px;
+            flex: 1;
+            justify-content: center;
+        }
+
+        .action-btn {
+            padding: 10px 20px;
+            border-radius: 0;
+            border: 1px solid var(--primary);
+            font-weight: 600;
+            font-family: 'Share Tech Mono', monospace;
+            font-size: 16px;
+            cursor: pointer;
+            box-shadow: 4px 4px 0px rgba(252, 238, 10, 0.2);
+            transition: all 0.2s;
+            clip-path: polygon(10px 0, 100% 0, 100% calc(100% - 10px), calc(100% - 10px) 100%, 0 100%, 0 10px);
+        }
+
+        .btn-redraw {
+            background: rgba(252, 238, 10, 0.1);
+            color: var(--primary);
+        }
+
+        .btn-redraw:hover {
+            background: var(--primary);
+            color: black;
+            box-shadow: 4px 4px 0px var(--accent);
+        }
+
+        .btn-redraw:active {
+            transform: translate(2px, 2px);
+        }
+
+        /* Hide leaflet draw toolbar */
+        .leaflet-draw-toolbar {
+            display: none !important;
+        }
+
+        .msg-tip {
+            text-align: center;
+            font-size: 14px;
+            color: var(--accent);
+            margin-bottom: 4px;
+            font-family: 'Share Tech Mono', monospace;
+            background: rgba(0, 243, 255, 0.1);
+            border: 1px dashed var(--accent);
+            padding: 8px;
+        }
+
+        /* CENTER TARGET */
+        .center-target {
+            position: absolute;
+            top: 50%;
+            left: 50%;
+            transform: translate(-50%, -50%);
+            z-index: 500;
+            pointer-events: none;
+            display: none;
+        }
+
+        .center-target.visible {
+            display: block;
+        }
+
+        /* NEW FAB (For adding) */
+        .main-fab {
+            position: absolute;
+            bottom: 40px;
+            right: 20px;
+            width: 64px;
+            height: 64px;
+            border-radius: 0;
+            background: var(--danger);
+            color: black;
+            font-size: 32px;
+            border: 2px solid var(--danger);
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            box-shadow: 6px 6px 0px var(--primary);
+            pointer-events: auto;
+            cursor: pointer;
+            z-index: 1000;
+            transition: all 0.2s;
+            clip-path: polygon(15px 0, 100% 0, 100% calc(100% - 15px), calc(100% - 15px) 100%, 0 100%, 0 15px);
+        }
+
+        .main-fab:active {
+            transform: translate(2px, 2px);
+            box-shadow: 2px 2px 0px var(--primary);
+        }
+
+        /* LEAFLET CUSTOMIZATIONS */
+        .leaflet-bar {
+            border: none !important;
+        }
+
+        .leaflet-bar a {
+            background: #1e293b !important;
+            color: white !important;
+            border-bottom: 1px solid #334155 !important;
+        }
+
+        /* DRAW OVERLAY */
+        #draw-overlay {
+            position: absolute;
+            top: 0;
+            left: 0;
+            right: 0;
+            bottom: 0;
+            z-index: 2000;
+            /* Above Map (1) and UI (1000) if needed, but UI is 1000. Let's make it below UI but above map? No, we want to draw everywhere. But if above UI, we can't click "Save". */
+            /* Actually, if we are drawing, we probably want to stop drawing to click save. */
+            /* Let's make it strictly for the map area. But simpler: */
+            /* If we make it z-index 1500, it covers map. The bottom controls are inside UI layer (z-index 1000). */
+            /* Wait, UI layer is pointer-events: none, but children are auto. */
+            /* If I put draw-overlay at z-index 999 (above map, below UI), it should work. */
+            z-index: 999;
+            display: none;
+            cursor: crosshair;
+            touch-action: none;
+            /* Critical for touch devices to allow preventing scroll */
+        }
+
+        #draw-overlay.active {
+            display: block;
+        }
+    </style>
+</head>
+
+<body>
+
+    <div id="map"></div>
+    <div id="draw-overlay"></div>
+
+    <!-- UI Overlay -->
+    <div class="ui-layer">
+
+        <!-- Header -->
+        <!-- Header -->
+        <div class="header-bar">
+            <div class="header-left">
+                <button onclick="goBack()" class="back-btn">←</button>
+            </div>
+
+            <span class="header-title">Gestión Zonas</span>
+
+            <div class="mode-switcher">
+                <button id="modeBlocked" onclick="setMode('blocked')" class="mode-btn active-blocked">⛔ Bloqueo</button>
+                <button id="modeFavorite" onclick="setMode('favorite')" class="mode-btn">💚 Favor</button>
+            </div>
+        </div>
+
+        <!-- Toggles Bar -->
+        <div class="toggles-bar">
+            <button id="toggleBlocked" class="toggle-chip" onclick="toggleConfig('blocked')">⛔ Bloqueo</button>
+            <button id="toggleFavorite" class="toggle-chip" onclick="toggleConfig('favorite')">💚 Favoritas</button>
+        </div>
+
+        <!-- Inputs Overlay (Top) -->
+        <div class="edit-inputs" id="editInputs">
+            <input type="text" id="zoneName" class="floating-input" placeholder="Nombre de Zona">
+            <select id="zoneType" class="floating-select">
+                <option value="both">Recojo y destino</option>
+                <option value="pickup">Solo Recojo</option>
+                <option value="destination">Solo Destino</option>
+            </select>
+            <!-- Hidden inputs -->
+            <input type="hidden" id="editZoneId">
+        </div>
+
+        <!-- Spacer for middle content -->
+        <div style="flex:1;"></div>
+
+        <!-- Controls Overlay (Bottom) -->
+        <div class="bottom-controls" id="editControls">
+            <div class="msg-tip" id="drawTip">Dibuja un polígono tocando el mapa</div>
+            <div class="slider-row">
+                <button class="trash-btn" type="button" onclick="deleteZone()">🗑️</button>
+                <div class="draw-actions">
+                    <button class="action-btn btn-redraw" onclick="startDrawing()">✏️ Redibujar</button>
+                </div>
+            </div>
+            <button class="save-btn" onclick="saveZone()">GUARDAR CAMBIOS</button>
+        </div>
+    </div>
+
+    <!-- Map Center Target -->
+    <div class="center-target" id="centerTarget">
+        <svg width="40" height="40" viewBox="0 0 40 40">
+            <circle cx="20" cy="20" r="4" fill="#3b82f6" stroke="white" stroke-width="2" />
+            <circle cx="20" cy="20" r="18" stroke="#3b82f6" stroke-width="2" stroke-dasharray="4 4" />
+            <line x1="20" y1="0" x2="20" y2="40" stroke="#3b82f6" stroke-width="1" stroke-opacity="0.5" />
+            <line x1="0" y1="20" x2="40" y2="20" stroke="#3b82f6" stroke-width="1" stroke-opacity="0.5" />
+        </svg>
+    </div>
+
+    <!-- FAB for Create -->
+    <button class="main-fab" id="mainFab" onclick="startCreate()">+</button>
+
+    <script src="https://unpkg.com/leaflet@1.9.4/dist/leaflet.js"></script>
+    <script src="https://cdnjs.cloudflare.com/ajax/libs/leaflet.draw/1.0.4/leaflet.draw.js"></script>
+    <script>
+        const USER_ID = "{{ user_id }}";
+
+        function goBack() {
+            // Dynamic back link
+            const baseUrl = window.location.pathname.startsWith('/test') ? '/test/config' : '/config';
+            const urlParams = new URLSearchParams(window.location.search);
+            // Pass through params
+            const lat = urlParams.get('lat') || '';
+            const lon = urlParams.get('lon') || '';
+            const version = "{{ version_key }}" || urlParams.get('version') || 'v1';
+            window.location.href = `${baseUrl}?user_id=${USER_ID}&lat=${lat}&lon=${lon}&version=${version}`;
+        }
+
+        let map;
+
+        // State
+        let currentMode = 'blocked'; // 'blocked' | 'favorite'
+        let zones = {
+            blocked: [],
+            favorite: []
+        };
+
+        let layers = {}; // Map layer references
+        let isEditing = false;
+
+        // Drawing tools
+        let drawControl;
+        let drawnItems;
+        let currentLayer = null; // The polygon being edited
+
+        // Freehand State
+        let isFreehandMode = false;
+        let freehandPolyline = null;
+        let freehandPoints = [];
+
+        // UI Colors (Sync with Cyberpunk CSS)
+        const COLORS = {
+            blocked: { main: '#ff003c', hover: '#cc0030' }, // Cyber Red
+            favorite: { main: '#00ff66', hover: '#00cc52' } // Success Green
+        };
+
+        // Config State
+        let configState = {
+            blocked_zones_enabled: true,
+            favorite_zones_enabled: false,
+            active_profile_id: 'Mi Perfil' // Default to avoid nulls
+        };
+
+
+
+        // Helper to get base URL (detects /test/)
+        function getBaseUrl() {
+            // Check pathname or full URL for /test/
+            if (window.location.pathname.startsWith('/test') || window.location.href.includes('/test/')) {
+                return '/test';
+            }
+            return '';
+        }
+
+        // Init
+        async function init() {
+            // Map Setup
+            map = L.map('map', { zoomControl: false }).setView([-12.0464, -77.0428], 13);
+            L.tileLayer('https://{s}.tile.openstreetmap.org/{z}/{x}/{y}.png', {
+                attribution: '',
+                maxZoom: 19
+            }).addTo(map);
+
+            // Init Draw Feature Group
+            drawnItems = new L.FeatureGroup();
+            map.addLayer(drawnItems);
+
+            // Locate
+            const urlParams = new URLSearchParams(window.location.search);
+            const latParam = urlParams.get('lat');
+            const lonParam = urlParams.get('lon');
+
+            if (latParam && lonParam) {
+                const lat = parseFloat(latParam);
+                const lon = parseFloat(lonParam);
+                if (!isNaN(lat) && !isNaN(lon)) {
+                    map.setView([lat, lon], 15);
+                    L.marker([lat, lon]).addTo(map).bindPopup("Ubicación Actual").openPopup();
+                }
+            } else if (navigator.geolocation) {
+                navigator.geolocation.getCurrentPosition(p => {
+                    const { latitude, longitude } = p.coords;
+                    map.setView([latitude, longitude], 14);
+                });
+            }
+
+            // Draw Handler (Leaflet Draw)
+            map.on(L.Draw.Event.CREATED, function (e) {
+                const layer = e.layer;
+                finishDrawing(layer);
+            });
+
+            // Custom Freehand Listeners (Overlay)
+            const overlay = document.getElementById('draw-overlay');
+            // Use pointer events if possible for unified handling, but start with standard touch/mouse
+            overlay.addEventListener('touchstart', (e) => handleInputDown(e, true), { passive: false });
+            overlay.addEventListener('touchmove', (e) => handleInputMove(e, true), { passive: false });
+            overlay.addEventListener('touchend', (e) => handleInputUp(e));
+
+            overlay.addEventListener('mousedown', (e) => handleInputDown(e, false));
+            overlay.addEventListener('mousemove', (e) => handleInputMove(e, false));
+            overlay.addEventListener('mouseup', (e) => handleInputUp(e));
+
+            await Promise.all([loadConfig(), loadAllZones()]);
+            setMode('blocked'); // Default
+        }
+
+        // --- FREEHAND LOGIC ---
+        function startFreehand() {
+            if (currentLayer) {
+                drawnItems.removeLayer(currentLayer);
+                currentLayer = null;
+            }
+
+            isFreehandMode = true;
+            document.getElementById('draw-overlay').classList.add('active');
+
+            document.getElementById('drawTip').innerText = "✍️ Dibuja arrastrando el dedo sobre el mapa...";
+            document.querySelector('.btn-redraw').classList.add('active-drawing');
+        }
+
+        function stopFreehand() {
+            isFreehandMode = false;
+            document.getElementById('draw-overlay').classList.remove('active');
+            document.querySelector('.btn-redraw').classList.remove('active-drawing');
+
+            // Clear temp line
+            if (freehandPolyline) {
+                map.removeLayer(freehandPolyline);
+                freehandPolyline = null;
+            }
+            freehandPoints = [];
+        }
+
+        function handleInputDown(e, isTouch) {
+            if (!isFreehandMode) return;
+            if (e.preventDefault) e.preventDefault();
+
+            const pt = isTouch ? e.touches[0] : e;
+            // Get coords relative to map container (which matches overlay)
+            const container = map.getContainer();
+            const rect = container.getBoundingClientRect();
+            const x = pt.clientX - rect.left;
+            const y = pt.clientY - rect.top;
+
+            const latlng = map.containerPointToLatLng([x, y]);
+
+            freehandPoints = [latlng];
+            freehandPolyline = L.polyline(freehandPoints, {
+                color: (currentMode === 'blocked' ? COLORS.blocked.main : COLORS.favorite.main),
+                weight: 3,
+                className: 'drawing-line'
+            }).addTo(map);
+        }
+
+        function handleInputMove(e, isTouch) {
+            if (!isFreehandMode || !freehandPolyline) return;
+            if (e.preventDefault) e.preventDefault();
+
+            const pt = isTouch ? e.touches[0] : e;
+            const container = map.getContainer();
+            const rect = container.getBoundingClientRect();
+            const x = pt.clientX - rect.left;
+            const y = pt.clientY - rect.top;
+
+            const latlng = map.containerPointToLatLng([x, y]);
+
+            freehandPoints.push(latlng);
+            freehandPolyline.setLatLngs(freehandPoints);
+        }
+
+        function handleInputUp(e) {
+            if (!isFreehandMode || !freehandPolyline) return;
+
+            // Close loop
+            if (freehandPoints.length > 2) {
+                freehandPoints.push(freehandPoints[0]);
+
+                // Create Polygon
+                const poly = L.polygon(freehandPoints, {
+                    color: (currentMode === 'blocked' ? COLORS.blocked.main : COLORS.favorite.main),
+                    weight: 3
+                });
+                finishDrawing(poly);
+            }
+
+            stopFreehand();
+        }
+
+        function finishDrawing(layer) {
+            if (currentLayer) drawnItems.removeLayer(currentLayer);
+            drawnItems.addLayer(layer);
+            currentLayer = layer;
+            document.getElementById('drawTip').innerText = "Zona lista. Guardar para aplicar.";
+        }
+
+        // --- CORE DATA ---
+        async function loadConfig() {
+            try {
+                // Fetch config from server
+                const r = await fetch(`${getBaseUrl()}/config?user_id=${USER_ID}&format=json&t=${Date.now()}`);
+                if (r.ok) {
+                    const data = await r.json();
+                    configState.blocked_zones_enabled = data.blocked_zones_enabled !== false; // Default True
+                    configState.favorite_zones_enabled = data.favorite_zones_enabled === true; // Default False
+                    if (data.active_profile_id) configState.active_profile_id = data.active_profile_id;
+                    updateTogglesUI();
+                }
+            } catch (e) {
+                console.error("Error loading config", e);
+            }
+        }
+
+        function updateTogglesUI() {
+            const btnB = document.getElementById('toggleBlocked');
+            const btnF = document.getElementById('toggleFavorite');
+
+            // Blocked
+            if (configState.blocked_zones_enabled) {
+                btnB.className = 'toggle-chip active blocked';
+                btnB.innerText = '⛔ Bloqueo: ON';
+            } else {
+                btnB.className = 'toggle-chip';
+                btnB.innerText = '⛔ Bloqueo: OFF';
+            }
+
+            // Favorite
+            if (configState.favorite_zones_enabled) {
+                btnF.className = 'toggle-chip active favorite';
+                btnF.innerText = '💚 Favoritas: ON';
+            } else {
+                btnF.className = 'toggle-chip';
+                btnF.innerText = '💚 Favoritas: OFF';
+            }
+        }
+
+        async function toggleConfig(type) {
+            // Toggle local state
+            if (type === 'blocked') {
+                configState.blocked_zones_enabled = !configState.blocked_zones_enabled;
+            } else if (type === 'favorite') {
+                configState.favorite_zones_enabled = !configState.favorite_zones_enabled;
+            }
+
+            // Update UI immediately
+            updateTogglesUI();
+            renderMap(); // Redraw map to reflect gray state
+
+            // Send to server
+            // Send to server
+            try {
+                await fetch(`${getBaseUrl()}/config`, {
+                    method: 'POST',
+                    headers: { 'Content-Type': 'application/json' },
+                    body: JSON.stringify({
+                        user_id: USER_ID,
+                        blocked_zones_enabled: configState.blocked_zones_enabled,
+                        favorite_zones_enabled: configState.favorite_zones_enabled,
+                        active_profile_id: configState.active_profile_id
+                    })
+                });
+            } catch (e) {
+                alert("Error guardando configuración");
+                // Revert on error?
+            }
+        }
+
+        async function loadAllZones() {
+            // Load Blocked
+            try {
+                const r = await fetch(`${getBaseUrl()}/blocked-zones?user_id=${USER_ID}&t=${Date.now()}`);
+                if (r.ok) {
+                    const d = await r.json();
+                    zones.blocked = Array.isArray(d) ? d : [];
+                } else {
+                    console.error("Failed to load blocked zones");
+                }
+            } catch (e) {
+                console.error("Error loading blocked zones", e);
+            }
+
+            // Load Favorite
+            try {
+                const r = await fetch(`${getBaseUrl()}/favorite-zones?user_id=${USER_ID}&t=${Date.now()}`);
+                if (r.ok) {
+                    const d = await r.json();
+                    zones.favorite = Array.isArray(d) ? d : [];
+                } else {
+                    console.error("Failed to load favorite zones: " + r.status);
+                }
+            } catch (e) {
+                console.error("Error loading favorite zones", e);
+            }
+
+            renderMap();
+        }
+
+        // --- RENDER ---
+        function renderMap() {
+            // Clear existing
+            Object.values(layers).forEach(Obj => {
+                if (Obj.poly) map.removeLayer(Obj.poly);
+                if (Obj.marker) map.removeLayer(Obj.marker);
+            });
+            layers = {};
+
+            // Render Function
+            const renderSet = (list, type) => {
+                const isActiveMode = (type === currentMode);
+
+                // Check if feature is globally enabled
+                const isFeatureEnabled = (type === 'blocked' ? configState.blocked_zones_enabled : configState.favorite_zones_enabled);
+
+                // Color determining logic
+                let baseColor;
+                if (!isFeatureEnabled) {
+                    baseColor = '#94a3b8'; // Gray (Slate 400) if disabled
+                } else {
+                    baseColor = (type === 'blocked') ? COLORS.blocked.main : COLORS.favorite.main;
+                }
+
+                // Visual Style
+                const opacity = isActiveMode ? 0.35 : 0.2;
+                const strokeOpacity = isActiveMode ? 1 : 0.5;
+                const interactive = isActiveMode;
+
+                list.forEach(z => {
+                    let poly;
+
+                    // BACKWARD COMPATIBILITY: If radius exists but NO points -> Draw Circle
+                    if (!z.points && z.radius_km && z.center) {
+                        poly = L.circle([z.center.lat, z.center.lon], {
+                            radius: z.radius_km * 1000,
+                            color: baseColor,
+                            fillColor: baseColor,
+                            fillOpacity: opacity,
+                            opacity: strokeOpacity,
+                            weight: isActiveMode ? 2 : 1,
+                            interactive: interactive
+                        }).addTo(map);
+                    }
+                    // POLYGON DRAWING
+                    else if (z.points && z.points.length >= 3) {
+                        const latlngs = z.points
+                            .filter(p => p && p.lat != null && (p.lon != null || p.lng != null))
+                            .map(p => [p.lat, (p.lon !== undefined ? p.lon : p.lng)]);
+
+                        if (latlngs.length < 3) return;
+
+                        poly = L.polygon(latlngs, {
+                            color: baseColor,
+                            fillColor: baseColor,
+                            fillOpacity: opacity,
+                            opacity: strokeOpacity,
+                            weight: isActiveMode ? 2 : 1,
+                            interactive: interactive
+                        }).addTo(map);
+                    } else {
+                        // Invalid zone data
+                        return;
+                    }
+
+                    // Only show marker/label if active mode
+                    let m = null;
+                    if (isActiveMode) {
+                        try {
+                            // Find center for marker
+                            let center;
+                            if (poly instanceof L.Circle) {
+                                center = poly.getLatLng();
+                            } else {
+                                center = poly.getBounds().getCenter();
+                            }
+
+                            m = L.marker(center).addTo(map);
+                            m.bindPopup(`<b>${z.name}</b><br>${type === 'blocked' ? '⛔' : '💚'}`);
+
+                            // Edit Bindings
+                            poly.on('click', (e) => { L.DomEvent.stopPropagation(e); startEdit(z.id, type); });
+                            m.on('click', (e) => { L.DomEvent.stopPropagation(e); startEdit(z.id, type); });
+                        } catch (err) {
+                            console.error("Error adding marker/events", err);
+                        }
+                    }
+
+                    layers[z.id] = { poly: poly, marker: m };
+                });
+            };
+
+            // Render "Other" first (background), then "Current" (foreground)
+            const otherMode = currentMode === 'blocked' ? 'favorite' : 'blocked';
+            renderSet(zones[otherMode], otherMode);
+            renderSet(zones[currentMode], currentMode);
+        }
+
+        // --- MODE SWITCHING ---
+        function setMode(mode) {
+            currentMode = mode;
+
+            // GUI Update
+            const btnBlocked = document.getElementById('modeBlocked');
+            const btnFavorite = document.getElementById('modeFavorite');
+            const mainFab = document.getElementById('mainFab');
+            const saveBtn = document.querySelector('.save-btn');
+
+            if (mode === 'blocked') {
+                btnBlocked.className = 'mode-btn active-blocked';
+                btnFavorite.className = 'mode-btn';
+                mainFab.style.background = COLORS.blocked.main;
+                mainFab.style.borderColor = COLORS.blocked.main;
+                saveBtn.style.background = COLORS.blocked.main;
+                saveBtn.style.borderColor = COLORS.blocked.main;
+                saveBtn.style.color = 'black';
+                saveBtn.style.boxShadow = '6px 6px 0px var(--primary)'; /* Yellow accent map save */
+                mainFab.style.boxShadow = '6px 6px 0px var(--primary)';
+                document.getElementById('zoneName').placeholder = "NOMBRE ZONA BLOQ.";
+            } else {
+                btnBlocked.className = 'mode-btn';
+                btnFavorite.className = 'mode-btn active-favorite';
+                mainFab.style.background = COLORS.favorite.main;
+                mainFab.style.borderColor = COLORS.favorite.main;
+                saveBtn.style.background = COLORS.favorite.main;
+                saveBtn.style.borderColor = COLORS.favorite.main;
+                saveBtn.style.color = 'black';
+                // Inverse styling colors
+                saveBtn.style.boxShadow = '6px 6px 0px var(--danger)';
+                mainFab.style.boxShadow = '6px 6px 0px var(--danger)';
+                document.getElementById('zoneName').placeholder = "NOMBRE ZONA FAV.";
+            }
+
+            // Refresh Map Visuals
+            renderMap();
+        }
+
+        // --- EDITING ---
+        function startCreate() {
+            enterEditMode({});
+            startDrawing(); // Immediately asking for drawing
+        }
+
+        function startEdit(id, type) {
+            // Find in current mode list
+            const list = zones[currentMode];
+            const z = list.find(x => x.id === id);
+            if (z) enterEditMode(z);
+        }
+
+        function startDrawing() {
+            startFreehand();
+        }
+
+        function enterEditMode(zone) {
+            isEditing = true;
+
+            // Values
+            document.getElementById('editZoneId').value = zone.id || '';
+            document.getElementById('zoneName').value = zone.name || '';
+            document.getElementById('zoneType').value = zone.applies_to || 'both';
+
+            // UI State
+            document.getElementById('editInputs').classList.add('visible');
+            document.getElementById('editControls').classList.add('visible');
+            document.getElementById('mainFab').style.transform = 'scale(0)';
+
+            // Hide header for cleaner view
+            document.querySelector('.header-bar').style.transform = "translateY(-100%)";
+            document.querySelector('.header-bar').style.transition = "transform 0.3s";
+
+            // Hide original layer if editing existing
+            if (zone.id && layers[zone.id]) {
+                const l = layers[zone.id];
+                if (l.poly) map.removeLayer(l.poly);
+                if (l.marker) map.removeLayer(l.marker);
+            }
+
+            // Put existing polygon into "drawnItems" for editing
+            drawnItems.clearLayers();
+            currentLayer = null;
+
+            if (zone.points) {
+                // Polygon
+                const latlngs = zone.points
+                    .filter(p => p && p.lat != null && (p.lon != null || p.lng != null))
+                    .map(p => [p.lat, (p.lon !== undefined ? p.lon : p.lng)]);
+
+                if (latlngs.length < 3) return; // Skip invalid
+
+                currentLayer = L.polygon(latlngs, {
+                    color: (currentMode === 'blocked' ? COLORS.blocked.main : COLORS.favorite.main),
+                    weight: 3
+                }).addTo(drawnItems);
+
+                map.fitBounds(currentLayer.getBounds(), { padding: [50, 50] });
+                document.getElementById('drawTip').innerText = "Polígono cargado. Redibujar si es necesario.";
+            }
+            else if (zone.radius_km && zone.center) {
+                // Legacy Circle -> We cannot easily convert circle to a manual polygon for editing without approximation
+                // Suggest user to redraw
+                document.getElementById('drawTip').innerText = "Zona circular antigua. Por favor REDIBUJAR como polígono.";
+
+                // Show it as visual guide anyway
+                L.circle([zone.center.lat, zone.center.lon], { radius: zone.radius_km * 1000, color: 'gray', dashArray: '5, 10' }).addTo(map);
+                map.setView([zone.center.lat, zone.center.lon], 14);
+            }
+        }
+
+        function exitEditMode() {
+            isEditing = false;
+            document.getElementById('editInputs').classList.remove('visible');
+            document.getElementById('editControls').classList.remove('visible');
+            document.getElementById('mainFab').style.transform = 'scale(1)';
+
+            // Show header
+            document.querySelector('.header-bar').style.transform = "translateY(0)";
+
+            drawnItems.clearLayers();
+            currentLayer = null;
+
+            // Re-render all to restore hidden ones
+            renderMap();
+        }
+
+        async function saveZone() {
+            const zid = document.getElementById('editZoneId').value;
+            let name = document.getElementById('zoneName').value.trim();
+            const appliesTo = document.getElementById('zoneType').value;
+
+            // Optional Name - Default to Timestamp
+            if (!name) {
+                const d = new Date();
+                name = `Zona ${d.getHours()}:${d.getMinutes().toString().padStart(2, '0')}`;
+            }
+
+            if (!currentLayer) return alert("Debes dibujar un polígono en el mapa");
+
+            // Extract Points
+            // Leaflet Draw Polygon: layer.getLatLngs() usually returns [ [latlng, latlng...] ] (nested)
+            let latlngs = currentLayer.getLatLngs();
+            if (Array.isArray(latlngs) && Array.isArray(latlngs[0])) {
+                latlngs = latlngs[0]; // Access the outer ring
+            }
+
+            // Reduce resolution if too many points (Freehand drawing can create thousands)
+            // Naive Simplification: Keep every Nth point + key points
+            let simplifiedPoints = [];
+
+            // First pass: Filter invalid objects
+            const validLatLngs = latlngs.filter(ll => ll && typeof ll.lat === 'number' && (typeof ll.lng === 'number' || typeof ll.lon === 'number'));
+
+            if (validLatLngs.length > 100) {
+                const step = Math.ceil(validLatLngs.length / 100);
+                for (let i = 0; i < validLatLngs.length; i += step) {
+                    if (validLatLngs[i]) simplifiedPoints.push(validLatLngs[i]);
+                }
+                // Ensure last point is included to close loop cleanly
+                if (validLatLngs.length > 0) {
+                    simplifiedPoints.push(validLatLngs[validLatLngs.length - 1]);
+                }
+            } else {
+                simplifiedPoints = validLatLngs;
+            }
+
+            const points = simplifiedPoints.map(ll => ({
+                lat: parseFloat(ll.lat),
+                lon: parseFloat(ll.lng !== undefined ? ll.lng : ll.lon)
+            })).filter(p => !isNaN(p.lat) && !isNaN(p.lon));
+
+            if (points.length < 3) return alert("El polígono debe tener al menos 3 puntos válidos.");
+
+            // Center for backwards compatibility / displaying labels
+            const bounds = currentLayer.getBounds();
+            const center = bounds.getCenter();
+
+            const payload = {
+                id: zid || undefined,
+                user_id: USER_ID, // CRITICAL: Required by backend
+                name: name,
+                applies_to: appliesTo,
+                active: true,
+                created_at: Date.now(),
+                points: points,
+                center: { lat: center.lat, lon: center.lng }, // Helper for map centering
+                radius_km: 0 // Deprecated
+            };
+
+            const endpoint = getBaseUrl() + (currentMode === 'blocked' ? '/blocked-zones' : '/favorite-zones');
+
+            try {
+                const r = await fetch(endpoint, {
+                    method: 'POST',
+                    headers: { 'Content-Type': 'application/json' },
+                    body: JSON.stringify(payload)
+                });
+
+                if (r.ok) {
+                    exitEditMode();
+                    await loadAllZones();
+                } else {
+                    alert("Error guardando zona");
+                }
+            } catch (e) {
+                console.error(e);
+                alert("Error de conexión");
+            }
+        }
+
+        async function deleteZone() {
+            const zid = document.getElementById('editZoneId').value;
+            if (!zid) {
+                exitEditMode();
+                return;
+            }
+
+            // if (!confirm("¿Eliminar esta zona?")) return;
+
+            const endpoint = getBaseUrl() + (currentMode === 'blocked' ? '/blocked-zones' : '/favorite-zones');
+            try {
+                const r = await fetch(`${endpoint}?id=${zid}&user_id=${USER_ID}`, { method: 'DELETE' });
+                if (r.ok) {
+                    exitEditMode();
+                    await loadAllZones();
+                }
+            } catch (e) {
+                alert("Error eliminando");
+            }
+        }
+
+        // Start
+        init();
+    </script>
+</body>
+
+</html>

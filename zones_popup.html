@@ -1,0 +1,350 @@
+<!DOCTYPE html>
+<html lang="es">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Gestión Rápida de Zonas</title>
+    <link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700&display=swap" rel="stylesheet">
+    <link href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.4.0/css/all.min.css" rel="stylesheet">
+    <style>
+        :root {
+            --bg-color: #121212;
+            --surface-color: #1e1e1e;
+            --primary-color: #BB86FC;
+            --primary-variant: #3700B3;
+            --secondary-color: #03DAC6;
+            --text-color: #FFFFFF;
+            --text-muted: #B3B3B3;
+            --danger-color: #CF6679;
+            --success-color: #00E676;
+            --border-radius: 16px;
+        }
+
+        * {
+            box-sizing: border-box;
+            margin: 0;
+            padding: 0;
+        }
+
+        body {
+            font-family: 'Inter', sans-serif;
+            background-color: transparent; /* Transparente porque va en un webview flotante si es posible, o bg-color */
+            color: var(--text-color);
+            display: flex;
+            justify-content: center;
+            align-items: center;
+            height: 100vh;
+            overflow: hidden;
+            background: rgba(18, 18, 18, 0.95);
+        }
+
+        .popup-container {
+            width: 100%;
+            max-width: 400px;
+            background: rgba(30, 30, 30, 0.85);
+            backdrop-filter: blur(12px);
+            -webkit-backdrop-filter: blur(12px);
+            border-radius: var(--border-radius);
+            padding: 24px;
+            border: 1px solid rgba(255, 255, 255, 0.1);
+            box-shadow: 0 8px 32px rgba(0, 0, 0, 0.5);
+        }
+
+        .header {
+            text-align: center;
+            margin-bottom: 24px;
+        }
+
+        .header h2 {
+            font-size: 1.5rem;
+            font-weight: 700;
+            background: linear-gradient(90deg, #BB86FC, #03DAC6);
+            -webkit-background-clip: text;
+            -webkit-text-fill-color: transparent;
+            margin-bottom: 8px;
+        }
+
+        .header p {
+            color: var(--text-muted);
+            font-size: 0.9rem;
+        }
+
+        .zone-card {
+            background: rgba(255, 255, 255, 0.05);
+            border-radius: 12px;
+            padding: 16px;
+            margin-bottom: 16px;
+            border: 1px solid rgba(255, 255, 255, 0.05);
+            transition: all 0.3s ease;
+        }
+
+        .zone-card.active {
+            border-color: var(--primary-color);
+            background: rgba(187, 134, 252, 0.05);
+        }
+
+        .zone-header {
+            display: flex;
+            justify-content: space-between;
+            align-items: center;
+            margin-bottom: 12px;
+        }
+
+        .zone-title {
+            display: flex;
+            align-items: center;
+            gap: 10px;
+            font-weight: 600;
+            font-size: 1.1rem;
+        }
+
+        .zone-title i.fa-ban { color: var(--danger-color); }
+        .zone-title i.fa-star { color: #FFD700; }
+
+        /* Modern Toggle Switch */
+        .switch {
+            position: relative;
+            display: inline-block;
+            width: 50px;
+            height: 28px;
+        }
+
+        .switch input { 
+            opacity: 0;
+            width: 0;
+            height: 0;
+        }
+
+        .slider {
+            position: absolute;
+            cursor: pointer;
+            top: 0; left: 0; right: 0; bottom: 0;
+            background-color: #333;
+            transition: .4s;
+            border-radius: 34px;
+        }
+
+        .slider:before {
+            position: absolute;
+            content: "";
+            height: 20px;
+            width: 20px;
+            left: 4px;
+            bottom: 4px;
+            background-color: white;
+            transition: .4s;
+            border-radius: 50%;
+        }
+
+        input:checked + .slider {
+            background-color: var(--primary-color);
+        }
+
+        input:checked + .slider:before {
+            transform: translateX(22px);
+        }
+
+        .btn-config {
+            width: 100%;
+            padding: 12px;
+            border: none;
+            border-radius: 8px;
+            background: rgba(255, 255, 255, 0.1);
+            color: white;
+            font-family: inherit;
+            font-weight: 600;
+            font-size: 0.95rem;
+            cursor: pointer;
+            display: flex;
+            justify-content: center;
+            align-items: center;
+            gap: 8px;
+            transition: all 0.2s ease;
+        }
+
+        .btn-config:hover {
+            background: rgba(255, 255, 255, 0.2);
+        }
+        
+        .btn-config:active {
+            transform: scale(0.98);
+        }
+
+        .btn-config.active-btn {
+            background: var(--primary-color);
+            color: #000;
+        }
+        
+        .btn-config.active-btn:hover {
+            background: #d0a8ff;
+        }
+
+        .loading-overlay {
+            position: absolute;
+            top: 0; left: 0; right: 0; bottom: 0;
+            background: rgba(18, 18, 18, 0.8);
+            display: flex;
+            justify-content: center;
+            align-items: center;
+            border-radius: var(--border-radius);
+            z-index: 10;
+            display: none;
+        }
+
+        .spinner {
+            width: 40px;
+            height: 40px;
+            border: 4px solid rgba(255,255,255,0.1);
+            border-top: 4px solid var(--primary-color);
+            border-radius: 50%;
+            animation: spin 1s linear infinite;
+        }
+
+        @keyframes spin { 0% { transform: rotate(0deg); } 100% { transform: rotate(360deg); } }
+    </style>
+</head>
+<body>
+
+    <div class="popup-container">
+        <div class="loading-overlay" id="loading">
+            <div class="spinner"></div>
+        </div>
+
+        <div class="header">
+            <h2>Gestión de Zonas</h2>
+            <p>Selecciona qué zonas activar en tus viajes</p>
+        </div>
+
+        <!-- Tarjeta Zonas Bloqueadas -->
+        <div class="zone-card" id="card-blocked">
+            <div class="zone-header">
+                <div class="zone-title">
+                    <i class="fa-solid fa-ban"></i>
+                    Zonas Bloqueadas
+                </div>
+                <label class="switch">
+                    <input type="checkbox" id="switch-blocked" onchange="toggleZone('blocked')">
+                    <span class="slider"></span>
+                </label>
+            </div>
+            <button class="btn-config" id="btn-cfg-blocked" onclick="goToConfig('blocked')">
+                <i class="fa-solid fa-map-location-dot"></i>
+                Configurar Bloqueos
+            </button>
+        </div>
+
+        <!-- Tarjeta Zonas Favoritas -->
+        <div class="zone-card" id="card-fav">
+            <div class="zone-header">
+                <div class="zone-title">
+                    <i class="fa-solid fa-star"></i>
+                    Zonas Favoritas
+                </div>
+                <label class="switch">
+                    <input type="checkbox" id="switch-fav" onchange="toggleZone('favorite')">
+                    <span class="slider"></span>
+                </label>
+            </div>
+            <button class="btn-config" id="btn-cfg-fav" onclick="goToConfig('favorite')">
+                <i class="fa-solid fa-map-location-dot"></i>
+                Configurar Favoritos
+            </button>
+        </div>
+    </div>
+
+    <script>
+        const userId = new URLSearchParams(window.location.search).get('user_id') || 'default_user';
+        const version = new URLSearchParams(window.location.search).get('version') || 'v1';
+
+        // Elementos DOM
+        const switchBlocked = document.getElementById('switch-blocked');
+        const switchFav = document.getElementById('switch-fav');
+        const cardBlocked = document.getElementById('card-blocked');
+        const cardFav = document.getElementById('card-fav');
+        const btnCfgBlocked = document.getElementById('btn-cfg-blocked');
+        const btnCfgFav = document.getElementById('btn-cfg-fav');
+        const loading = document.getElementById('loading');
+
+        // Cargar estado inicial
+        async function loadConfig() {
+            try {
+                loading.style.display = 'flex';
+                const response = await fetch(`/config?user_id=${userId}&format=json`);
+                const config = await response.json();
+                
+                switchBlocked.checked = config.blocked_zones_enabled || false;
+                switchFav.checked = config.favorite_zones_enabled || false;
+                
+                updateVisuals();
+            } catch (error) {
+                console.error("Error cargando config:", error);
+            } finally {
+                loading.style.display = 'none';
+            }
+        }
+
+        // Manejar cambios (Mutuamente exclusivos)
+        async function toggleZone(type) {
+            let blockedEnabled = switchBlocked.checked;
+            let favEnabled = switchFav.checked;
+
+            if (type === 'blocked' && blockedEnabled) {
+                favEnabled = false;
+                switchFav.checked = false;
+            } else if (type === 'favorite' && favEnabled) {
+                blockedEnabled = false;
+                switchBlocked.checked = false;
+            }
+
+            updateVisuals();
+            
+            // Si el usuario enciende una zona, lo redirigimos directo al mapa después de guardar
+            const shouldRedirect = (type === 'blocked' && blockedEnabled) || (type === 'favorite' && favEnabled);
+
+            await saveConfig(blockedEnabled, favEnabled);
+
+            if (shouldRedirect) {
+                goToConfig(type);
+            }
+        }
+
+        // Actualizar UI
+        function updateVisuals() {
+            cardBlocked.classList.toggle('active', switchBlocked.checked);
+            cardFav.classList.toggle('active', switchFav.checked);
+            
+            btnCfgBlocked.classList.toggle('active-btn', switchBlocked.checked);
+            btnCfgFav.classList.toggle('active-btn', switchFav.checked);
+        }
+
+        // Guardar configuración en backend
+        async function saveConfig(blocked, fav) {
+            try {
+                loading.style.display = 'flex';
+                await fetch('/config', {
+                    method: 'POST',
+                    headers: { 'Content-Type': 'application/json' },
+                    body: JSON.stringify({
+                        user_id: userId,
+                        blocked_zones_enabled: blocked,
+                        favorite_zones_enabled: fav
+                    })
+                });
+            } catch (error) {
+                console.error("Error guardando config:", error);
+            } finally {
+                loading.style.display = 'none';
+            }
+        }
+
+        // Redirigir al mapa
+        function goToConfig(type) {
+            // El mapa unificado de zones_manager funciona con ambas, pero podríamos pasarle el parámetro type
+            window.location.href = `/zones-manager?user_id=${userId}&version=${version}&type=${type}`;
+        }
+
+        // Iniciar
+        loadConfig();
+    </script>
+</body>
+</html>
